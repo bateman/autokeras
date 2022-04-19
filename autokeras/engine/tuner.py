@@ -17,7 +17,7 @@ import copy
 import os
 
 import keras_tuner
-from tensorflow import keras
+import tensorflow as tf
 from tensorflow import nest
 from tensorflow.keras import callbacks as tf_callbacks
 from tensorflow.keras.layers.experimental import preprocessing
@@ -33,11 +33,11 @@ class AutoTuner(keras_tuner.engine.tuner.Tuner):
     Different from KerasTuner's Tuner class. AutoTuner's not only tunes the
     Hypermodel which can be directly built into a Keras model, but also the
     preprocessors. Therefore, a HyperGraph stores the overall search space containing
-    both the Preprocessors and Hypermodel. For every trial, the HyperGraph builds the
+    both the Preprocessors and Hypermodel. For every trial, the HyperGraph build the
     PreprocessGraph and KerasGraph with the provided HyperParameters.
 
     The AutoTuner uses EarlyStopping for acceleration during the search and fully
-    trains the model with full epochs and with both training and validation data.
+    train the model with full epochs and with both training and validation data.
     The fully trained model is the best model to be used by AutoModel.
 
     # Arguments
@@ -58,9 +58,9 @@ class AutoTuner(keras_tuner.engine.tuner.Tuner):
         # Override the function to prevent building the model during initialization.
         return
 
-    def get_best_model(self):
+    def get_best_model(self, custom_objects=None):
         with keras_tuner.engine.tuner.maybe_distribute(self.distribution_strategy):
-            model = keras.models.load_model(self.best_model_path)
+            model = tf.keras.models.load_model(self.best_model_path, custom_objects)
         return model
 
     def get_best_pipeline(self):
@@ -72,7 +72,7 @@ class AutoTuner(keras_tuner.engine.tuner.Tuner):
     def _prepare_model_build(self, hp, **kwargs):
         """Prepare for building the Keras model.
 
-        It builds the Pipeline from HyperPipeline, transforms the dataset to set
+        It build the Pipeline from HyperPipeline, transform the dataset to set
         the input shapes and output shapes of the HyperModel.
         """
         dataset = kwargs["x"]
@@ -116,7 +116,7 @@ class AutoTuner(keras_tuner.engine.tuner.Tuner):
             output_layers = []
             tensor = nest.flatten(tensor)[0]
             for layer in model.layers:
-                if isinstance(layer, keras.layers.InputLayer):
+                if isinstance(layer, tf.keras.layers.InputLayer):
                     continue
                 input_node = nest.flatten(layer.input)[0]
                 if input_node is tensor:
