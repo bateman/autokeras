@@ -20,7 +20,6 @@ from typing import Union
 
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 from tensorflow import nest
 
 from autokeras import blocks
@@ -112,6 +111,7 @@ class AutoModel(object):
         seed: Int. Random seed.
         max_model_size: Int. Maximum number of scalars in the parameters of a
             model. Models larger than this are rejected.
+        custom_objects: Dict. Dictionary for custom objects.
         **kwargs: Any arguments supported by keras_tuner.Tuner.
     """
 
@@ -127,10 +127,12 @@ class AutoModel(object):
         overwrite: bool = False,
         seed: Optional[int] = None,
         max_model_size: Optional[int] = None,
+        custom_objects: Optional[dict] = None,
         **kwargs
     ):
         self.inputs = nest.flatten(inputs)
         self.outputs = nest.flatten(outputs)
+        self.custom_objects = custom_objects
         self.seed = seed
         if seed:
             np.random.seed(seed)
@@ -199,10 +201,10 @@ class AutoModel(object):
             # When initializing multiple AutoModel with Task API, if not
             # counting from 1 for each of the AutoModel, the predefined hp
             # values in task specifiec tuners would not match the names.
-            keras.backend.clear_session()
+            tf.keras.backend.clear_session()
             graph = self._assemble()
             self.outputs = graph.outputs
-            keras.backend.clear_session()
+            tf.keras.backend.clear_session()
 
         return graph
 
@@ -449,7 +451,7 @@ class AutoModel(object):
         self._check_data_format((x, None), predict=True)
         dataset = self._adapt(x, self.inputs, batch_size)
         pipeline = self.tuner.get_best_pipeline()
-        model = self.tuner.get_best_model()
+        model = self.tuner.get_best_model(self.custom_objects)
         dataset = pipeline.transform_x(dataset)
         dataset = tf.data.Dataset.zip((dataset, dataset))
         y = model.predict(dataset, **kwargs)
@@ -488,7 +490,7 @@ class AutoModel(object):
         dataset = tf.data.Dataset.zip((x, y))
         pipeline = self.tuner.get_best_pipeline()
         dataset = pipeline.transform(dataset)
-        model = self.tuner.get_best_model()
+        model = self.tuner.get_best_model(self.custom_objects)
         return utils.evaluate_with_adaptive_batch_size(
             model=model, batch_size=batch_size, x=dataset, verbose=verbose, **kwargs
         )
@@ -497,7 +499,7 @@ class AutoModel(object):
         """Export the best Keras Model.
 
         # Returns
-            keras.Model instance. The best model found during the search, loaded
+            tf.keras.Model instance. The best model found during the search, loaded
             with trained weights.
         """
-        return self.tuner.get_best_model()
+        return self.tuner.get_best_model(self.custom_objects)
